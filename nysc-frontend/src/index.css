@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Color tokens — Light mining theme: earthy rust, ochre, coal grays, bright sky accents */
+  --color-navy: #1F2937; /* Re-purposing navy to a dark coal gray for text */
+  --color-navy-light: #374151;
+  --color-atmosphere: #F9FAFB; /* Clean white/light gray background */
+  --color-atmosphere-dim: #F3F4F6;
+  --color-ochre: #D97706; /* Vibrant amber/rust */
+  --color-ochre-light: #F59E0B;
+  --color-moss: #166534; /* Deep earth green */
+  --color-moss-light: #22C55E;
+  --color-ink: #111827; /* Near black for strong contrast */
+  --color-ink-soft: #4B5563; /* Soft gray for secondary text */
+  --color-gold: #FBBF24;
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'IBM Plex Sans', sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 14px; /* Scales down 1rem from 16px to 14px, reducing all Tailwind sizes globally by 12.5% */
+}
+
+@layer utilities {
+  /* Compensate for the 14px root scale so containers don't look too narrow on wide screens */
+  .max-w-7xl { max-width: 92rem; } /* originally 80rem */
+  .max-w-6xl { max-width: 82rem; } /* originally 72rem */
+  .max-w-5xl { max-width: 72rem; } /* originally 64rem */
+  .max-w-4xl { max-width: 64rem; } /* originally 56rem */
+}
+
+body {
+  background-color: var(--color-atmosphere);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
