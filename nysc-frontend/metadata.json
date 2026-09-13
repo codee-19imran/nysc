@@ -1,0 +1,6 @@
+{
+  "name": "NYSC-2026",
+  "description": "National Young Scientist Conference 2026 (NYSC-2026): Next Generation Technologies for Earth Observation, Mining Safety & Sustainable Development. Organized by Central University of Karnataka under the patronage of ISRO.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
