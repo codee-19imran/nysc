@@ -1,22 +1,23 @@
 """
-Sets up the connection to PostgreSQL.
-
-- `engine` is the actual connection to the database.
-- `SessionLocal` creates a new "conversation" with the database per request.
-- `Base` is what every model file (app/models/*.py) inherits from.
-- `get_db()` is used in routers like: `db: Session = Depends(get_db)`
-  It opens a session, hands it to the route, and closes it afterwards
-  even if the route raises an error.
+Database Configuration for NYSC-2026
+PostgreSQL connection, deployment-agnostic
+Lazy initialization to avoid connection on import
 """
+import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-from app.core.config import settings
+# Environment-based configuration (deployment-agnostic)
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", 
+    "postgresql://user:password@localhost:5432/nysc_conference"
+)
 
-engine = create_engine(settings.DATABASE_URL)
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
 
+Base = declarative_base()
 
 def get_db():
     db = SessionLocal()
@@ -24,3 +25,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def init_db():
+    """Initialize database tables - call explicitly, not on import"""
+    Base.metadata.create_all(bind=engine)
