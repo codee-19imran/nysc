@@ -24,12 +24,15 @@ export default function DelegateDashboard() {
 
   if (!user) return null;
 
+  // Exactly 7 tabs as per specification - no more, no less
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: Home },
-    { id: 'schedule', label: 'My Schedule', icon: Calendar },
-    { id: 'documents', label: 'Documents', icon: FileText },
-    { id: 'services', label: 'Services', icon: Package },
-    { id: 'announcements', label: 'News', icon: Bell },
+    { id: 'checkin', label: 'Check-in Status', icon: CheckCircle },
+    { id: 'idcard', label: 'ID Card', icon: Award },
+    { id: 'announcements', label: 'Announcements', icon: Bell },
+    { id: 'qrcode', label: 'My QR Code', icon: QrCode },
+    { id: 'schedule', label: 'Schedule', icon: Calendar },
+    { id: 'paper', label: 'Paper Upload', icon: Upload },
+    { id: 'helpdesk', label: 'Help Desk', icon: AlertCircle },
   ];
 
   return (
