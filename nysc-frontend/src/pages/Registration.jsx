@@ -1,7 +1,7 @@
-import { auth as apiAuth, papers as apiPapers, registrations as apiReg, payments as apiPayments, loadRazorpay } from '../lib/api';
+import { auth as apiAuth, registrations as apiReg, payments as apiPayments, loadRazorpay } from '../lib/api';
 import { useState, useMemo, useEffect } from 'react';
-import { Check, X, FileText, Briefcase, Mail, Phone, MapPin, User, ChevronRight, Key, Upload, Info, AlertCircle, Lock, CreditCard, CheckCircle } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Check, X, Mail, Phone, MapPin, User, Upload, AlertCircle, Lock, CheckCircle, GraduationCap, Building2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import PageTransition from '../components/PageTransition';
 import { isAdminRole } from '../lib/roles';
 import PhotoUpload from '../components/PhotoUpload';
@@ -36,7 +36,6 @@ export default function Registration() {
     institution: '',
     educationLevel: '',
     studentClass: '',
-    fieldOfStudy: '',
     graduationYear: '',
     // Common Address fields
     state: '',
@@ -48,12 +47,7 @@ export default function Registration() {
     // Account
     password: '',
     confirmPassword: '',
-    // Paper details
-    paperTitle: '',
-    coAuthors: [{ name: '', institution: '', email: '' }],
     // Agreements
-    agreeDeclaration: false,
-    agreeMandatory: false,
     agreeTerms: false,
   });
 
@@ -61,7 +55,7 @@ export default function Registration() {
   useEffect(() => {
     const user = apiAuth.getUser();
     if (user && isAdminRole(user.role)) {
-      navigate('/admin');  // Redirect all admin roles to admin dashboard
+      navigate('/admin');
     }
   }, [navigate]);
 
@@ -106,29 +100,6 @@ export default function Registration() {
     handleChange({ target: { name: 'phone', value: val } });
   };
 
-  const handleCoAuthorChange = (index, e) => {
-    const { name, value } = e.target;
-    const updatedCoAuthors = [...formData.coAuthors];
-    updatedCoAuthors[index] = { ...updatedCoAuthors[index], [name]: value };
-    setFormData(prev => ({ ...prev, coAuthors: updatedCoAuthors }));
-  };
-
-  const addCoAuthor = () => {
-    if (formData.coAuthors.length < 3) {
-      setFormData(prev => ({
-        ...prev,
-        coAuthors: [...prev.coAuthors, { name: '', institution: '', email: '' }]
-      }));
-    }
-  };
-
-  const removeCoAuthor = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      coAuthors: prev.coAuthors.filter((_, i) => i !== index)
-    }));
-  };
-
   const passwordRules = useMemo(() => {
     const pwd = formData.password;
     return {
@@ -140,21 +111,12 @@ export default function Registration() {
   }, [formData.password]);
 
   const isPasswordValid = Object.values(passwordRules).every(Boolean);
-  const isNonPresenter = formData.category === 'professional' || formData.subCategory === 'attendee';
-  const isSchoolStudent = formData.educationLevel === 'School (Class 9-12)';
-
-  const progressSteps = isNonPresenter
-    ? [
-      { id: 1, label: 'Profile & Account' },
-      { id: 2, label: 'Payment & Review' }
-    ]
-    : [
-      { id: 1, label: 'Profile & Account' },
-      { id: 2, label: 'Paper Details' },
-      { id: 3, label: 'Payment & Review' }
-    ];
-
-  const currentDisplayStep = isNonPresenter && step === 3 ? 2 : step;
+  
+  // Simplified: All users go through same 2-step flow (Profile → Payment)
+  const progressSteps = [
+    { id: 1, label: 'Profile & Account' },
+    { id: 2, label: 'Payment & Review' }
+  ];
 
   // --- VALIDATION LOGIC ---
   const validateStep = (currentStep) => {
@@ -184,11 +146,9 @@ export default function Registration() {
         if (!formData.institution.trim()) { newErrors.institution = "School / University name is required."; isValid = false; }
         if (!formData.educationLevel) { newErrors.educationLevel = "Please select your education level."; isValid = false; }
 
-        if (isSchoolStudent) {
+        if (formData.educationLevel === 'School (Class 9-12)') {
           if (!formData.studentClass) { newErrors.studentClass = "Please select your class."; isValid = false; }
-          if (!formData.fieldOfStudy.trim()) { newErrors.fieldOfStudy = "Stream (e.g., Science, PCM) is required."; isValid = false; }
         } else {
-          if (!formData.fieldOfStudy.trim()) { newErrors.fieldOfStudy = "Degree / Field of study is required."; isValid = false; }
           if (!formData.graduationYear) { newErrors.graduationYear = "Expected graduation year is required."; isValid = false; }
         }
       } else if (formData.category === 'professional') {
@@ -203,12 +163,6 @@ export default function Registration() {
     }
 
     if (currentStep === 2) {
-      if (!formData.paperTitle.trim()) { newErrors.paperTitle = "Proposed paper title is required."; isValid = false; }
-      if (!formData.agreeDeclaration) { newErrors.agreeDeclaration = "You must agree to the author declaration."; isValid = false; }
-      if (!formData.agreeMandatory) { newErrors.agreeMandatory = "You must agree to the mandatory presentation clause."; isValid = false; }
-    }
-
-    if (currentStep === 3) {
       if (!formData.agreeTerms) { newErrors.agreeTerms = "You must agree to the terms and conditions."; isValid = false; }
     }
 
@@ -267,24 +221,12 @@ export default function Registration() {
           throw new Error(errorData.detail || 'Failed to upload photo');
         }
 
-        // Success! Move to the next step
-        if (isNonPresenter) {
-          setStep(3);
-        } else {
-          setStep(2);
-        }
-      }
-
-      // --- STEP 2: Paper Details Submission ---
-      else if (step === 2) {
-        await apiPapers.submitPaper(formData);
-
-        // Clear the local draft since they are moving to payment
+        // Success! Move to payment step
         localStorage.removeItem('nysc_registration_draft');
-        setStep(3);
+        setStep(2);
       }
 
-      // --- STEP 3: Just UI Navigation for now (Payment comes next) ---
+      // --- STEP 2: Just UI Navigation for Payment ---
       else {
         setStep(prev => prev + 1);
       }
@@ -302,11 +244,7 @@ export default function Registration() {
   const prevStep = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setErrors({});
-    if (step === 3 && isNonPresenter) {
-      setStep(1);
-    } else {
-      setStep(prev => prev - 1);
-    }
+    setStep(prev => prev - 1);
   };
 
   const registrationFee = formData.category === 'student' ? 2999 : 4199;
@@ -531,7 +469,7 @@ export default function Registration() {
                           {errors.educationLevel && <p className="text-xs text-red-600 mt-0.5">{errors.educationLevel}</p>}
                         </div>
 
-                        {isSchoolStudent && (
+                        {formData.educationLevel === 'School (Class 9-12)' && (
                           <>
                             <div className="flex flex-col gap-1.5">
                               <label className="text-xs font-bold uppercase tracking-wider text-ink-soft">Class / Grade <span className="text-red-500">*</span></label>
@@ -546,13 +484,11 @@ export default function Registration() {
                               </select>
                               {errors.studentClass && <p className="text-xs text-red-600 mt-0.5">{errors.studentClass}</p>}
                             </div>
-                            <FormInput label="Stream (e.g., Science, PCM, PCB)" name="fieldOfStudy" value={formData.fieldOfStudy} onChange={handleChange} required error={errors.fieldOfStudy} />
                           </>
                         )}
 
-                        {!isSchoolStudent && formData.educationLevel && (
+                        {formData.educationLevel !== 'School (Class 9-12)' && formData.educationLevel && (
                           <>
-                            <FormInput label="Degree / Field of Study" name="fieldOfStudy" value={formData.fieldOfStudy} onChange={handleChange} required error={errors.fieldOfStudy} placeholder="e.g., B.Tech Mining Engineering" />
                             <div className="flex flex-col gap-1.5">
                               <label className="text-xs font-bold uppercase tracking-wider text-ink-soft">Expected Graduation Year <span className="text-red-500">*</span></label>
                               <select
@@ -598,58 +534,79 @@ export default function Registration() {
               </div>
             )}
 
-            {/* STEP 2: Academic & Paper Details (Only for Student Presenters) */}
+            {/* STEP 2: Payment & Review */}
             {step === 2 && (
               <div className="space-y-8">
                 <div>
-                  <h2 className="text-xl font-display font-bold text-navy mb-1">Paper Information</h2>
+                  <h2 className="text-xl font-display font-bold text-navy mb-1">Review & Payment</h2>
                   <p className="text-sm text-ink-soft mb-6">
-                    As a registered presenter, you will upload your full paper and supplementary materials via your personal dashboard after successful payment.
+                    Please review your details before proceeding to payment. Paper submission will be done via your dashboard after registration.
                   </p>
-                  <FormInput label="Proposed Paper Title" name="paperTitle" value={formData.paperTitle} onChange={handleChange} required multiline error={errors.paperTitle} />
                 </div>
 
                 <div className="border-t border-ink/10 pt-8">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-display font-bold text-navy">Co-Authors (Optional)</h2>
-                    {formData.coAuthors.length < 3 && (
-                      <button type="button" onClick={addCoAuthor} className="text-sm font-medium text-ochre hover:text-ochre/80 transition-colors">+ Add Co-Author</button>
+                  <h3 className="text-lg font-display font-bold text-navy mb-4">Personal Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div><span className="text-ink-soft">Full Name:</span><br/><strong className="text-navy">{formData.fullName}</strong></div>
+                    <div><span className="text-ink-soft">Email:</span><br/><strong className="text-navy">{formData.email}</strong></div>
+                    <div><span className="text-ink-soft">Phone:</span><br/><strong className="text-navy">{formData.phone}</strong></div>
+                    <div><span className="text-ink-soft">Category:</span><br/><strong className="text-navy capitalize">{formData.category === 'student' ? 'Student Delegate' : 'Working Professional'}</strong></div>
+                    {formData.category === 'student' && (
+                      <>
+                        <div><span className="text-ink-soft">Institution:</span><br/><strong className="text-navy">{formData.institution}</strong></div>
+                        <div><span className="text-ink-soft">Education Level:</span><br/><strong className="text-navy">{formData.educationLevel}</strong></div>
+                      </>
                     )}
-                  </div>
-                  <div className="space-y-4">
-                    {formData.coAuthors.map((author, index) => (
-                      <div key={index} className="p-4 border border-ink/10 rounded-lg bg-atmosphere/50">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">Co-Author {index + 1}</span>
-                          {index > 0 && <button type="button" onClick={() => removeCoAuthor(index)} className="text-xs text-red-600 hover:text-red-800">Remove</button>}
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <FormInput label="Full Name" name="name" value={author.name} onChange={(e) => handleCoAuthorChange(index, e)} />
-                          <FormInput label="Institution" name="institution" value={author.institution} onChange={(e) => handleCoAuthorChange(index, e)} />
-                          <FormInput label="Email" name="email" type="email" value={author.email} onChange={(e) => handleCoAuthorChange(index, e)} />
-                        </div>
-                      </div>
-                    ))}
+                    {formData.category === 'professional' && (
+                      <>
+                        <div><span className="text-ink-soft">Organization:</span><br/><strong className="text-navy">{formData.organization}</strong></div>
+                        <div><span className="text-ink-soft">Designation:</span><br/><strong className="text-navy">{formData.designation}</strong></div>
+                      </>
+                    )}
+                    <div><span className="text-ink-soft">State:</span><br/><strong className="text-navy">{formData.state}</strong></div>
+                    <div><span className="text-ink-soft">City:</span><br/><strong className="text-navy">{formData.city}</strong></div>
                   </div>
                 </div>
 
                 <div className="border-t border-ink/10 pt-8 space-y-4">
-                  {errors.agreeDeclaration && <p className="text-xs text-red-600 font-medium">{errors.agreeDeclaration}</p>}
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input type="checkbox" name="agreeDeclaration" checked={formData.agreeDeclaration} onChange={handleChange} className="mt-1 accent-ochre w-4 h-4" />
+                  {errors.agreeTerms && <p className="text-xs text-red-600 font-medium">{errors.agreeTerms}</p>}
+                  <label className={`flex items-start gap-3 cursor-pointer p-4 border rounded-lg ${errors.agreeTerms ? 'border-red-300 bg-red-50' : 'border-ink/10 bg-atmosphere/50'}`}>
+                    <input type="checkbox" name="agreeTerms" checked={formData.agreeTerms} onChange={handleChange} className="mt-1 accent-ochre w-4 h-4" />
                     <span className="text-sm text-ink-soft leading-relaxed">
-                      <strong className="text-navy">Primary Author Declaration:</strong> I declare that I am the primary author of the aforementioned paper and have the consent of all listed co-authors to present this work at NYSC-2026.
+                      <strong className="text-navy">Terms and Conditions:</strong> I agree to abide by the conference rules, code of conduct, and understand that registration fees are non-refundable. I consent to the use of my provided data for conference-related communications only.
                     </span>
                   </label>
+                </div>
 
-                  {errors.agreeMandatory && <p className="text-xs text-red-600 font-medium">{errors.agreeMandatory}</p>}
-                  <label className={`flex items-start gap-3 cursor-pointer p-4 border rounded-lg ${errors.agreeMandatory ? 'border-red-300 bg-red-50' : 'border-red-200 bg-red-50/50'}`}>
-                    <input type="checkbox" name="agreeMandatory" checked={formData.agreeMandatory} onChange={handleChange} className="mt-1 accent-red-600 w-4 h-4" />
-                    <span className="text-sm text-navy leading-relaxed font-medium">
-                      <AlertCircle className="w-4 h-4 text-red-600 inline mr-1 -mt-0.5" />
-                      <strong>Mandatory Presentation Clause:</strong> I understand and agree that failure to physically present my accepted paper at the conference will result in my exclusion from the conference proceedings and will render the registration fee non-refundable.
-                    </span>
-                  </label>
+                <div className="border-t border-ink/10 pt-8">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <p className="text-sm text-ink-soft">Total Registration Fee</p>
+                      <p className="text-2xl font-display font-bold text-navy">₹{registrationFee.toLocaleString('en-IN')}</p>
+                    </div>
+                  </div>
+
+                  {paymentError && (
+                    <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-700 font-medium">{paymentError}</p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handlePayment}
+                    disabled={isProcessingPayment || !formData.agreeTerms}
+                    className={`w-full py-4 px-6 rounded-lg font-body font-bold text-white transition-all ${isProcessingPayment || !formData.agreeTerms
+                        ? 'bg-ink/30 cursor-not-allowed'
+                        : 'bg-ochre hover:bg-ochre/90 active:scale-[0.99]'
+                      }`}
+                  >
+                    {isProcessingPayment ? 'Processing...' : `Pay ₹${registrationFee.toLocaleString('en-IN')}`}
+                  </button>
+
+                  {!formData.agreeTerms && (
+                    <p className="text-xs text-center text-ink-soft mt-3">Please agree to the terms and conditions to proceed with payment.</p>
+                  )}
                 </div>
               </div>
             )}
