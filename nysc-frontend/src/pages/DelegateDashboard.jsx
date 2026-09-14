@@ -72,11 +72,13 @@ export default function DelegateDashboard() {
 
       {/* Content */}
       <div className="max-w-6xl mx-auto px-6 py-6">
-        {activeTab === 'overview' && <OverviewTab user={user} />}
-        {activeTab === 'schedule' && <ScheduleTab user={user} />}
-        {activeTab === 'documents' && <DocumentsTab user={user} />}
-        {activeTab === 'services' && <ServicesTab user={user} />}
+        {activeTab === 'checkin' && <CheckInTab user={user} />}
+        {activeTab === 'idcard' && <IDCardTab user={user} />}
         {activeTab === 'announcements' && <AnnouncementsTab />}
+        {activeTab === 'qrcode' && <QRCodeTab user={user} />}
+        {activeTab === 'schedule' && <ScheduleTab user={user} />}
+        {activeTab === 'paper' && <PaperUploadTab user={user} />}
+        {activeTab === 'helpdesk' && <HelpDeskTab user={user} />}
       </div>
     </div>
   );
@@ -793,6 +795,332 @@ function PaperItem({ initialPaper, onRefresh, domains = [], deadlineStatus = nul
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ============ CHECK-IN STATUS TAB ============
+function CheckInTab({ user }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    request('/delegate/checkin-status').then(setData).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="text-center py-12">Loading...</div>;
+  if (!data) return <div className="text-center py-12 text-red-500">Failed to load check-in status.</div>;
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="bg-white rounded-xl border border-ink/10 p-8 text-center">
+        <CheckCircle className={`w-20 h-20 mx-auto mb-4 ${data.checked_in ? 'text-green-600' : 'text-orange-500'}`} />
+        <h2 className="text-2xl font-display font-bold text-navy mb-2">
+          {data.checked_in ? 'Checked In' : 'Not Checked In'}
+        </h2>
+        <p className="text-ink mb-4">
+          {data.checked_in 
+            ? `You checked in on ${new Date(data.checkin_time).toLocaleString()}`
+            : 'Please visit the registration desk to check in'}
+        </p>
+        {data.last_checkin && (
+          <div className="mt-4 p-4 bg-atmosphere rounded-lg">
+            <p className="text-sm text-ink">Last Check-in: {new Date(data.last_checkin).toLocaleString()}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============ ID CARD STATUS TAB ============
+function IDCardTab({ user }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    request('/delegate/idcard-status').then(setData).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="text-center py-12">Loading...</div>;
+  if (!data) return <div className="text-center py-12 text-red-500">Failed to load ID card status.</div>;
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="bg-white rounded-xl border border-ink/10 p-8 text-center">
+        {data.status === 'generated' ? (
+          <>
+            <Award className="w-20 h-20 mx-auto mb-4 text-ochre" />
+            <h2 className="text-2xl font-display font-bold text-navy mb-2">ID Card Generated</h2>
+            <p className="text-ink mb-4">Your ID card is ready for download</p>
+            <button className="px-6 py-3 bg-ochre text-white rounded-lg font-medium hover:bg-ochre/90 transition-colors">
+              Download ID Card
+            </button>
+          </>
+        ) : (
+          <>
+            <Clock className="w-20 h-20 mx-auto mb-4 text-orange-500" />
+            <h2 className="text-2xl font-display font-bold text-navy mb-2">ID Card Pending</h2>
+            <p className="text-ink mb-4">Your ID card will be generated after check-in</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============ QR CODE TAB ============
+function QRCodeTab({ user }) {
+  const [qrData, setQrData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    request('/delegate/qrcode').then(setQrData).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="text-center py-12">Loading...</div>;
+  if (!qrData) return <div className="text-center py-12 text-red-500">Failed to load QR code.</div>;
+
+  return (
+    <div className="max-w-md mx-auto space-y-6">
+      <div className="bg-white rounded-xl border border-ink/10 p-8 text-center">
+        <QrCode className="w-16 h-16 mx-auto mb-4 text-navy" />
+        <h2 className="text-xl font-display font-bold text-navy mb-2">Your QR Code</h2>
+        <p className="text-sm text-ink mb-6">Show this QR code for check-in and meal scanning</p>
+        
+        <div className="bg-atmosphere p-6 rounded-lg mb-4">
+          <img 
+            src={`data:image/svg+xml;base64,${btoa(qrData.svg || '<svg></svg>')}`} 
+            alt="Your QR Code" 
+            className="w-48 h-48 mx-auto"
+          />
+        </div>
+        
+        <p className="text-xs text-ink">
+          Note: Your registration photo is NOT visible to you. It will only be shown to volunteers/admins when your QR code is scanned for verification.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ============ PAPER UPLOAD TAB ============
+function PaperUploadTab({ user }) {
+  const [paperData, setPaperData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [file, setFile] = useState(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    request('/delegate/paper-status').then(setPaperData).finally(() => setLoading(false));
+  }, []);
+
+  const handleUpload = async () => {
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('paper', file);
+    
+    setUploading(true);
+    setError('');
+    setSuccess(false);
+    
+    try {
+      await request('/delegate/paper-upload', {
+        method: 'POST',
+        body: formData,
+      });
+      setSuccess(true);
+      setPaperData(prev => ({ ...prev, status: 'uploaded', uploaded_at: new Date().toISOString() }));
+    } catch (err) {
+      setError(err.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (loading) return <div className="text-center py-12">Loading...</div>;
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="bg-white rounded-xl border border-ink/10 p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <Upload className="w-8 h-8 text-ochre" />
+          <div>
+            <h2 className="text-xl font-display font-bold text-navy">Paper Upload & Tracking</h2>
+            <p className="text-sm text-ink">Upload your research paper and track its review status</p>
+          </div>
+        </div>
+
+        {/* Upload Section */}
+        <div className="mb-8 p-6 bg-atmosphere rounded-lg">
+          <label className="block text-sm font-medium text-navy mb-2">
+            Upload Paper (PDF only)
+          </label>
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={(e) => setFile(e.target.files[0])}
+            className="block w-full text-sm text-ink file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-ochre file:text-white hover:file:bg-ochre/90"
+          />
+          
+          {file && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-ink">
+              <FileText className="w-4 h-4" />
+              <span>{file.name}</span>
+            </div>
+          )}
+          
+          {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+          {success && <p className="mt-2 text-sm text-green-600">✓ Upload successful!</p>}
+          
+          <button
+            onClick={handleUpload}
+            disabled={!file || uploading}
+            className="mt-4 px-6 py-2 bg-ochre text-white rounded-lg font-medium hover:bg-ochre/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {uploading ? 'Uploading...' : 'Upload Paper'}
+          </button>
+        </div>
+
+        {/* Status Section */}
+        {paperData && (
+          <div className="space-y-4">
+            <h3 className="font-display font-bold text-navy">Submission Status</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-atmosphere rounded-lg">
+                <p className="text-xs text-ink mb-1">Current Status</p>
+                <p className="font-medium text-navy capitalize">{paperData.status || 'Not Uploaded'}</p>
+              </div>
+              
+              <div className="p-4 bg-atmosphere rounded-lg">
+                <p className="text-xs text-ink mb-1">Uploaded On</p>
+                <p className="font-medium text-navy">
+                  {paperData.uploaded_at ? new Date(paperData.uploaded_at).toLocaleDateString() : 'N/A'}
+                </p>
+              </div>
+            </div>
+            
+            {paperData.review_comments && (
+              <div className="p-4 bg-atmosphere rounded-lg">
+                <p className="text-xs text-ink mb-1">Review Comments</p>
+                <p className="text-sm text-navy">{paperData.review_comments}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============ HELP DESK TAB ============
+function HelpDeskTab({ user }) {
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    request('/delegate/tickets').then(setTickets).finally(() => setLoading(false));
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await request('/delegate/tickets', {
+        method: 'POST',
+        body: JSON.stringify({ subject, message }),
+      });
+      setShowForm(false);
+      setSubject('');
+      setMessage('');
+      setTickets(prev => [{ id: Date.now(), subject, message, status: 'open', created_at: new Date().toISOString() }, ...prev]);
+    } catch (err) {
+      console.error('Failed to create ticket', err);
+    }
+  };
+
+  if (loading) return <div className="text-center py-12">Loading...</div>;
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="bg-white rounded-xl border border-ink/10 p-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-8 h-8 text-ochre" />
+            <div>
+              <h2 className="text-xl font-display font-bold text-navy">Help Desk</h2>
+              <p className="text-sm text-ink">Submit queries or report issues</p>
+            </div>
+          </div>
+          
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="px-4 py-2 bg-ochre text-white rounded-lg text-sm font-medium hover:bg-ochre/90 transition-colors"
+          >
+            {showForm ? 'Cancel' : 'New Ticket'}
+          </button>
+        </div>
+
+        {showForm && (
+          <form onSubmit={handleSubmit} className="mb-8 p-6 bg-atmosphere rounded-lg space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-navy mb-1">Subject</label>
+              <input
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="w-full px-4 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-ochre"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-navy mb-1">Message</label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows="4"
+                className="w-full px-4 py-2 border border-ink/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-ochre"
+                required
+              />
+            </div>
+            <button type="submit" className="px-6 py-2 bg-ochre text-white rounded-lg font-medium hover:bg-ochre/90 transition-colors">
+              Submit Ticket
+            </button>
+          </form>
+        )}
+
+        {/* Existing Tickets */}
+        <div className="space-y-4">
+          <h3 className="font-display font-bold text-navy">My Tickets</h3>
+          {tickets.length === 0 ? (
+            <p className="text-sm text-ink text-center py-8">No tickets submitted yet</p>
+          ) : (
+            tickets.map(ticket => (
+              <div key={ticket.id} className="p-4 border border-ink/10 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-navy">{ticket.subject}</h4>
+                  <span className={`text-xs px-2 py-1 rounded-full capitalize ${
+                    ticket.status === 'open' ? 'bg-green-100 text-green-700' :
+                    ticket.status === 'resolved' ? 'bg-blue-100 text-blue-700' :
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    {ticket.status}
+                  </span>
+                </div>
+                <p className="text-sm text-ink mb-2">{ticket.message}</p>
+                <p className="text-xs text-ink">Created: {new Date(ticket.created_at).toLocaleString()}</p>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
